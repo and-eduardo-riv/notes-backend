@@ -15,29 +15,6 @@ const requestLogger = (request, response, next) => {
 app.use(express.json());
 app.use(requestLogger);
 
-let notes = [
-  {
-    id: 1,
-    content: "HTML is easy",
-    important: true,
-  },
-  {
-    id: 2,
-    content: "Browser can execute only JavaScript",
-    important: false,
-  },
-  {
-    id: 3,
-    content: "GET and POST are the most important methods of HTTP protocol",
-    important: true,
-  },
-];
-
-const generateId = () => {
-  const maxId = notes.length > 0 ? Math.max(...notes.map((n) => n.id)) : 0;
-  return maxId + 1;
-};
-
 app.get("/", (request, response) => {
   response.send("<h1>Hello World!</h1>");
 });
@@ -49,9 +26,18 @@ app.get("/api/notes", (request, response) => {
 });
 
 app.get("/api/notes/:id", (request, response) => {
-  Note.findById(request.params.id).then((note) => {
-    response.json(note);
-  });
+  Note.findById(request.params.id)
+    .then((note) => {
+      if (note) {
+        response.json(note);
+      } else {
+        response.status(404).end();
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+      response.status(400).send({ error: "malformatted id" });
+    });
 });
 
 app.delete("/api/notes/:id", (request, response) => {
