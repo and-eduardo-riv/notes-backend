@@ -1,8 +1,10 @@
 const mongoose = require("mongoose");
 const supertest = require("supertest");
 const helper = require("./test_helper");
+const bcrypt = require("bcrypt");
 const app = require("../app");
 const Note = require("../models/note");
+const User = require("../models/user");
 
 const api = supertest(app);
 
@@ -18,7 +20,14 @@ beforeEach(async () => {
     let noteObject = new Note(note);
     await noteObject.save();
   }
-});
+
+  await User.deleteMany({});
+
+  const passwordHash = await bcrypt.hash("secret", 10);
+  const user = new User({ username: "root", passwordHash });
+
+  await user.save();
+}, 10000);
 
 describe("when there is initially some notes saved", () => {
   test("notes are returned as json", async () => {
@@ -71,6 +80,10 @@ describe("viewing a specific note", () => {
 
 describe("addition of a new note", () => {
   test("succeeds with valid data", async () => {
+    const credentials = { username: "root", password: "secret" };
+    const result = await api.post("/api/login").send(credentials).expect(200);
+    const { token } = result.body;
+
     const newNote = {
       content: "async/await simplifies making async calls",
       important: true,
@@ -78,6 +91,10 @@ describe("addition of a new note", () => {
 
     await api
       .post("/api/notes")
+      .set({
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      })
       .send(newNote)
       .expect(201)
       .expect("Content-Type", /application\/json/);
@@ -90,11 +107,22 @@ describe("addition of a new note", () => {
   });
 
   test("fails with statuscode 400 if data is invalid", async () => {
+    const credentials = { username: "root", password: "secret" };
+    const result = await api.post("/api/login").send(credentials).expect(200);
+    const { token } = result.body;
+
     const newNote = {
       important: true,
     };
 
-    await api.post("/api/notes").send(newNote).expect(400);
+    await api
+      .post("/api/notes")
+      .set({
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      })
+      .send(newNote)
+      .expect(400);
 
     const notesAtEnd = await helper.notesInDb();
 
